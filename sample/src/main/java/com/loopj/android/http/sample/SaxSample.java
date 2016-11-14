@@ -1,13 +1,13 @@
 /*
     Android Asynchronous Http Client Sample
     Copyright (c) 2014 Marek Sebera <marek.sebera@gmail.com>
-    http://loopj.com
+    https://loopj.com
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
     You may obtain a copy of the License at
 
-        http://www.apache.org/licenses/LICENSE-2.0
+        https://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,24 +23,19 @@ import com.loopj.android.http.RequestHandle;
 import com.loopj.android.http.ResponseHandlerInterface;
 import com.loopj.android.http.SaxAsyncHttpResponseHandler;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.DefaultHandler;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import cz.msebera.android.httpclient.Header;
+import cz.msebera.android.httpclient.HttpEntity;
+
 public class SaxSample extends SampleParentActivity {
 
     private static final String LOG_TAG = "SaxSample";
-
-    @Override
-    public ResponseHandlerInterface getResponseHandler() {
-        return saxAsyncHttpResponseHandler;
-    }
-
-    private SaxAsyncHttpResponseHandler saxAsyncHttpResponseHandler = new SaxAsyncHttpResponseHandler<SAXTreeStructure>(new SAXTreeStructure()) {
+    private final SaxAsyncHttpResponseHandler saxAsyncHttpResponseHandler = new SaxAsyncHttpResponseHandler<SAXTreeStructure>(new SAXTreeStructure()) {
         @Override
         public void onStart() {
             clearOutputs();
@@ -68,6 +63,11 @@ public class SaxSample extends SampleParentActivity {
     };
 
     @Override
+    public ResponseHandlerInterface getResponseHandler() {
+        return saxAsyncHttpResponseHandler;
+    }
+
+    @Override
     public String getDefaultURL() {
         return "http://bin-iin.com/sitemap.xml";
     }
@@ -93,8 +93,8 @@ public class SaxSample extends SampleParentActivity {
     }
 
     private class Tuple {
-        public Integer color;
-        public String text;
+        public final Integer color;
+        public final String text;
 
         public Tuple(int _color, String _text) {
             this.color = _color;
@@ -104,7 +104,7 @@ public class SaxSample extends SampleParentActivity {
 
     private class SAXTreeStructure extends DefaultHandler {
 
-        public List<Tuple> responseViews = new ArrayList<Tuple>();
+        public final List<Tuple> responseViews = new ArrayList<Tuple>();
 
         public void startElement(String namespaceURI, String localName,
                                  String rawName, Attributes atts) {

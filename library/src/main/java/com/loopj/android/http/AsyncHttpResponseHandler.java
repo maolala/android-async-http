@@ -1,13 +1,13 @@
 /*
     Android Asynchronous Http Client
     Copyright (c) 2011 James Smith <james@loopj.com>
-    http://loopj.com
+    https://loopj.com
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
     You may obtain a copy of the License at
 
-        http://www.apache.org/licenses/LICENSE-2.0
+        https://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,29 +21,29 @@ package com.loopj.android.http;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import android.util.Log;
-
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.HttpResponseException;
-import org.apache.http.util.ByteArrayBuffer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.net.URI;
+
+import cz.msebera.android.httpclient.Header;
+import cz.msebera.android.httpclient.HttpEntity;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.StatusLine;
+import cz.msebera.android.httpclient.client.HttpResponseException;
+import cz.msebera.android.httpclient.util.ByteArrayBuffer;
 
 /**
  * Used to intercept and handle the responses from requests made using {@link AsyncHttpClient}. The
- * {@link #onSuccess(int, org.apache.http.Header[], byte[])} method is designed to be anonymously
+ * {@link #onSuccess(int, cz.msebera.android.httpclient.Header[], byte[])} method is designed to be anonymously
  * overridden with your own response handling code. <p>&nbsp;</p> Additionally, you can override the
- * {@link #onFailure(int, org.apache.http.Header[], byte[], Throwable)}, {@link #onStart()}, {@link
- * #onFinish()}, {@link #onRetry(int)} and {@link #onProgress(int, int)} methods as required.
+ * {@link #onFailure(int, cz.msebera.android.httpclient.Header[], byte[], Throwable)}, {@link #onStart()}, {@link
+ * #onFinish()}, {@link #onRetry(int)} and {@link #onProgress(long, long)} methods as required.
  * <p>&nbsp;</p> For example: <p>&nbsp;</p>
  * <pre>
  * AsyncHttpClient client = new AsyncHttpClient();
- * client.get("http://www.google.com", new AsyncHttpResponseHandler() {
+ * client.get("https://www.google.com", new AsyncHttpResponseHandler() {
  *     &#064;Override
  *     public void onStart() {
  *         // Initiated the request
@@ -67,7 +67,7 @@ import java.net.URI;
  *     }
  *
  *     &#064;Override
- *     public void onProgress(int bytesWritten, int totalSize) {
+ *     public void onProgress(long bytesWritten, long totalSize) {
  *         // Progress notification
  *     }
  *
@@ -78,10 +78,11 @@ import java.net.URI;
  * });
  * </pre>
  */
+@SuppressWarnings("DesignForExtension")
 public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterface {
 
-    private static final String LOG_TAG = "AsyncHttpResponseHandler";
-
+    public static final String DEFAULT_CHARSET = "UTF-8";
+    public static final String UTF8_BOM = "\uFEFF";
     protected static final int SUCCESS_MESSAGE = 0;
     protected static final int FAILURE_MESSAGE = 1;
     protected static final int START_MESSAGE = 2;
@@ -89,11 +90,8 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
     protected static final int PROGRESS_MESSAGE = 4;
     protected static final int RETRY_MESSAGE = 5;
     protected static final int CANCEL_MESSAGE = 6;
-
     protected static final int BUFFER_SIZE = 4096;
-
-    public static final String DEFAULT_CHARSET = "UTF-8";
-    public static final String UTF8_BOM = "\uFEFF";
+    private static final String LOG_TAG = "AsyncHttpRH";
     private String responseCharset = DEFAULT_CHARSET;
     private Handler handler;
     private boolean useSynchronousMode;
@@ -102,6 +100,7 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
     private URI requestURI = null;
     private Header[] requestHeaders = null;
     private Looper looper = null;
+    private WeakReference<Object> TAG = new WeakReference<Object>(null);
 
     /**
      * Creates a new AsyncHttpResponseHandler
@@ -118,13 +117,8 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
      * @param looper The looper to work with
      */
     public AsyncHttpResponseHandler(Looper looper) {
-        this.looper = looper == null ? Looper.myLooper() : looper;
-
-        // Use asynchronous mode by default.
-        setUseSynchronousMode(false);
-
         // Do not use the pool's thread to fire callbacks by default.
-        setUsePoolThread(false);
+        this(looper == null ? Looper.myLooper() : looper, false);
     }
 
     /**
@@ -134,17 +128,34 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
      * @param usePoolThread Whether to use the pool's thread to fire callbacks
      */
     public AsyncHttpResponseHandler(boolean usePoolThread) {
-        // Whether to use the pool's thread to fire callbacks.
-        setUsePoolThread(usePoolThread);
+        this(usePoolThread ? null : Looper.myLooper(), usePoolThread);
+    }
 
-        // When using the pool's thread, there's no sense in having a looper.
-        if (!getUsePoolThread()) {
-            // Use the current thread's looper.
-            this.looper = Looper.myLooper();
-
-            // Use asynchronous mode by default.
-            setUseSynchronousMode(false);
+    private AsyncHttpResponseHandler(Looper looper, boolean usePoolThread) {
+        if (!usePoolThread) {
+            Utils.asserts(looper != null, "use looper thread, must call Looper.prepare() first!");
+            this.looper = looper;
+            // Create a handler on current thread to submit tasks
+            this.handler = new ResponderHandler(this, looper);
+        } else {
+            Utils.asserts(looper == null, "use pool thread, looper should be null!");
+            // If pool thread is to be used, there's no point in keeping a reference
+            // to the looper and handler.
+            this.looper = null;
+            this.handler = null;
         }
+
+        this.usePoolThread = usePoolThread;
+    }
+
+    @Override
+    public Object getTag() {
+        return this.TAG.get();
+    }
+
+    @Override
+    public void setTag(Object TAG) {
+        this.TAG = new WeakReference<Object>(TAG);
     }
 
     @Override
@@ -153,35 +164,18 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
     }
 
     @Override
-    public Header[] getRequestHeaders() {
-        return this.requestHeaders;
-    }
-
-    @Override
     public void setRequestURI(URI requestURI) {
         this.requestURI = requestURI;
     }
 
     @Override
-    public void setRequestHeaders(Header[] requestHeaders) {
-        this.requestHeaders = requestHeaders;
+    public Header[] getRequestHeaders() {
+        return this.requestHeaders;
     }
 
-    /**
-     * Avoid leaks by using a non-anonymous handler class.
-     */
-    private static class ResponderHandler extends Handler {
-        private final AsyncHttpResponseHandler mResponder;
-
-        ResponderHandler(AsyncHttpResponseHandler mResponder, Looper looper) {
-            super(looper);
-            this.mResponder = mResponder;
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            mResponder.handleMessage(msg);
-        }
+    @Override
+    public void setRequestHeaders(Header[] requestHeaders) {
+        this.requestHeaders = requestHeaders;
     }
 
     @Override
@@ -194,7 +188,7 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
         // A looper must be prepared before setting asynchronous mode.
         if (!sync && looper == null) {
             sync = true;
-            Log.w(LOG_TAG, "Current thread has not called Looper.prepare(). Forcing synchronous mode.");
+            AsyncHttpClient.log.w(LOG_TAG, "Current thread has not called Looper.prepare(). Forcing synchronous mode.");
         }
 
         // If using asynchronous mode.
@@ -226,18 +220,18 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
         usePoolThread = pool;
     }
 
+    public String getCharset() {
+        return this.responseCharset == null ? DEFAULT_CHARSET : this.responseCharset;
+    }
+
     /**
      * Sets the charset for the response string. If not set, the default is UTF-8.
      *
      * @param charset to be used for the response string.
-     * @see <a href="http://docs.oracle.com/javase/7/docs/api/java/nio/charset/Charset.html">Charset</a>
+     * @see <a href="https://docs.oracle.com/javase/7/docs/api/java/nio/charset/Charset.html">Charset</a>
      */
     public void setCharset(final String charset) {
         this.responseCharset = charset;
-    }
-
-    public String getCharset() {
-        return this.responseCharset == null ? DEFAULT_CHARSET : this.responseCharset;
     }
 
     /**
@@ -246,8 +240,8 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
      * @param bytesWritten offset from start of file
      * @param totalSize    total size of file
      */
-    public void onProgress(int bytesWritten, int totalSize) {
-        Log.v(LOG_TAG, String.format("Progress %d from %d (%2.0f%%)", bytesWritten, totalSize, (totalSize > 0) ? (bytesWritten * 1.0 / totalSize) * 100 : -1));
+    public void onProgress(long bytesWritten, long totalSize) {
+        AsyncHttpClient.log.v(LOG_TAG, String.format("Progress %d from %d (%2.0f%%)", bytesWritten, totalSize, (totalSize > 0) ? (bytesWritten * 1.0 / totalSize) * 100 : -1));
     }
 
     /**
@@ -300,20 +294,20 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
      * @param retryNo number of retry
      */
     public void onRetry(int retryNo) {
-        Log.d(LOG_TAG, String.format("Request retry no. %d", retryNo));
+        AsyncHttpClient.log.d(LOG_TAG, String.format("Request retry no. %d", retryNo));
     }
 
     public void onCancel() {
-        Log.d(LOG_TAG, "Request got cancelled");
+        AsyncHttpClient.log.d(LOG_TAG, "Request got cancelled");
     }
 
     public void onUserException(Throwable error) {
-        Log.e(LOG_TAG, "User-space exception detected!", error);
+        AsyncHttpClient.log.e(LOG_TAG, "User-space exception detected!", error);
         throw new RuntimeException(error);
     }
 
     @Override
-    final public void sendProgressMessage(int bytesWritten, int bytesTotal) {
+    final public void sendProgressMessage(long bytesWritten, long bytesTotal) {
         sendMessage(obtainMessage(PROGRESS_MESSAGE, new Object[]{bytesWritten, bytesTotal}));
     }
 
@@ -358,7 +352,7 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
                     if (response != null && response.length >= 3) {
                         onSuccess((Integer) response[0], (Header[]) response[1], (byte[]) response[2]);
                     } else {
-                        Log.e(LOG_TAG, "SUCCESS_MESSAGE didn't got enough params");
+                        AsyncHttpClient.log.e(LOG_TAG, "SUCCESS_MESSAGE didn't got enough params");
                     }
                     break;
                 case FAILURE_MESSAGE:
@@ -366,7 +360,7 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
                     if (response != null && response.length >= 4) {
                         onFailure((Integer) response[0], (Header[]) response[1], (byte[]) response[2], (Throwable) response[3]);
                     } else {
-                        Log.e(LOG_TAG, "FAILURE_MESSAGE didn't got enough params");
+                        AsyncHttpClient.log.e(LOG_TAG, "FAILURE_MESSAGE didn't got enough params");
                     }
                     break;
                 case START_MESSAGE:
@@ -379,12 +373,12 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
                     response = (Object[]) message.obj;
                     if (response != null && response.length >= 2) {
                         try {
-                            onProgress((Integer) response[0], (Integer) response[1]);
+                            onProgress((Long) response[0], (Long) response[1]);
                         } catch (Throwable t) {
-                            Log.e(LOG_TAG, "custom onProgress contains an error", t);
+                            AsyncHttpClient.log.e(LOG_TAG, "custom onProgress contains an error", t);
                         }
                     } else {
-                        Log.e(LOG_TAG, "PROGRESS_MESSAGE didn't got enough params");
+                        AsyncHttpClient.log.e(LOG_TAG, "PROGRESS_MESSAGE didn't got enough params");
                     }
                     break;
                 case RETRY_MESSAGE:
@@ -392,14 +386,14 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
                     if (response != null && response.length == 1) {
                         onRetry((Integer) response[0]);
                     } else {
-                        Log.e(LOG_TAG, "RETRY_MESSAGE didn't get enough params");
+                        AsyncHttpClient.log.e(LOG_TAG, "RETRY_MESSAGE didn't get enough params");
                     }
                     break;
                 case CANCEL_MESSAGE:
                     onCancel();
                     break;
             }
-        } catch(Throwable error) {
+        } catch (Throwable error) {
             onUserException(error);
         }
     }
@@ -480,12 +474,13 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
                     ByteArrayBuffer buffer = new ByteArrayBuffer(buffersize);
                     try {
                         byte[] tmp = new byte[BUFFER_SIZE];
-                        int l, count = 0;
+                        long count = 0;
+                        int l;
                         // do not send messages if request has been cancelled
                         while ((l = instream.read(tmp)) != -1 && !Thread.currentThread().isInterrupted()) {
                             count += l;
                             buffer.append(tmp, 0, l);
-                            sendProgressMessage(count, (int) (contentLength <= 0 ? 1 : contentLength));
+                            sendProgressMessage(count, (contentLength <= 0 ? 1 : contentLength));
                         }
                     } finally {
                         AsyncHttpClient.silentCloseInputStream(instream);
@@ -499,5 +494,22 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
             }
         }
         return responseBody;
+    }
+
+    /**
+     * Avoid leaks by using a non-anonymous handler class.
+     */
+    private static class ResponderHandler extends Handler {
+        private final AsyncHttpResponseHandler mResponder;
+
+        ResponderHandler(AsyncHttpResponseHandler mResponder, Looper looper) {
+            super(looper);
+            this.mResponder = mResponder;
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            mResponder.handleMessage(msg);
+        }
     }
 }

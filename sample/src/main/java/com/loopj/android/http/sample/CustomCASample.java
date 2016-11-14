@@ -1,13 +1,13 @@
 /*
     Android Asynchronous Http Client Sample
     Copyright (c) 2014 Marek Sebera <marek.sebera@gmail.com>
-    http://loopj.com
+    https://loopj.com
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
     You may obtain a copy of the License at
 
-        http://www.apache.org/licenses/LICENSE-2.0
+        https://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,18 +23,15 @@ import android.content.DialogInterface;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
+
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.BaseJsonHttpResponseHandler;
 import com.loopj.android.http.RequestHandle;
 import com.loopj.android.http.ResponseHandlerInterface;
 import com.loopj.android.http.sample.util.SampleJSON;
 import com.loopj.android.http.sample.util.SecureSocketFactory;
-
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,6 +41,9 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+
+import cz.msebera.android.httpclient.Header;
+import cz.msebera.android.httpclient.HttpEntity;
 
 /**
  * This sample demonstrates the implementation of self-signed CA's and connection to servers with
@@ -57,7 +57,7 @@ public class CustomCASample extends SampleParentActivity {
     private static final String LOG_TAG = "CustomCASample";
 
     // This is A TEST URL for use with AsyncHttpClient LIBRARY ONLY!
-    // It is provided courtesy of Fineswap (http://fineswap.com) and must never
+    // It is provided courtesy of Fineswap (https://fineswap.com) and must never
     // be used in ANY program except when running this sample (CustomCASample).
     private static final String SERVER_TEST_URL = "https://api.fineswap.io/ahc";
 
@@ -190,12 +190,12 @@ public class CustomCASample extends SampleParentActivity {
         builder.setTitle(R.string.title_custom_ca);
         builder.setMessage(getReadmeText());
         builder.setNeutralButton(android.R.string.cancel,
-            new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
                 }
-            }
         );
         builder.show();
     }
